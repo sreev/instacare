@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InstaCare</title>
+</head>
+<body>
+    <h1>Welcome to your Instant Care Doctor</h1>
+
+    <video id="video" width="640" height="480" autoplay></video>
+    <button id="start">Start Recording</button>
+    <button id="stop" disabled>Stop Recording</button>
+    <button id="upload" disabled>Upload Recording</button>
+
+    <script>
+        let mediaRecorder;
+        let recordedChunks = [];
+        let videoStream;
+
+        // Get access to the user's camera and microphone
+        const videoElement = document.getElementById('video');
+        const startButton = document.getElementById('start');
+        const stopButton = document.getElementById('stop');
+        const uploadButton = document.getElementById('upload');
+
+        startButton.onclick = async () => {
+            // Access the camera and microphone
+            videoStream = await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: true
+            });
+
+            videoElement.srcObject = videoStream;
+
+            // Set up MediaRecorder to capture the stream
+            mediaRecorder = new MediaRecorder(videoStream);
+
+            // Capture video and audio data in chunks
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.start();
+            startButton.disabled = true;
+            stopButton.disabled = false;
+        };
+
+        stopButton.onclick = () => {
+            mediaRecorder.stop();
+            videoStream.getTracks().forEach(track => track.stop());
+            stopButton.disabled = true;
+            uploadButton.disabled = false;
+        };
+
+        uploadButton.onclick = () => {
+            const blob = new Blob(recordedChunks, { type: 'video/webm' });
+            const formData = new FormData();
+            formData.append('file', blob, 'recording.webm');
+
+            // Send the recorded video/audio to the server
+            fetch('/upload', {
+                method: 'POST',
+                body: formData
+            }).then(response => {
+                if (response.ok) {
+                    alert('File uploaded successfully');
+                } else {
+                    alert('File upload failed');
+                }
+            });
+        };
+    </script>
+</body>
+</html>
