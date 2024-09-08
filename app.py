@@ -5,6 +5,7 @@ import os
 import base64
 import subprocess
 import requests
+import json
 from pathlib import Path
 from openai import OpenAI
 import time
@@ -91,6 +92,29 @@ def call_model(transcription_text, images):
     # print(response.json())
     return res_msg
 
+def modelResponse(prompt):
+    url = "http://192.168.3.251:11434/api/generate"
+    headers = {
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": "llama3",
+        "prompt": prompt,
+        "stream": False
+    }
+
+    response = requests.post(url, headers=headers, data=json.dumps(data))
+
+    if response.status_code == 200:
+        response_text = response.text
+        data = json.loads(response_text)
+        actual_response = data["response"]
+        print(actual_response)
+        return actual_response
+    else:
+        print("Error: ", response.status_code, response.text)
+
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -149,6 +173,12 @@ def upload_audio():
     print("Response is ", response)
     audio_response = tts(response)
     return jsonify({"response": audio_response})
+
+
+@app.route('/actual_response')
+def actual_response():
+    modelResponse("I have a headache")
+
 
 if __name__ == '__main__':
     app.run(debug=True)
