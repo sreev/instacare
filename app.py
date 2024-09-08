@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, send_from_directory
 import whisper
 import openai
 import os
@@ -23,11 +23,20 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 if not openai.api_key:
     raise ValueError("OpenAI API key not found. Make sure you have set the OPENAI_API_KEY environment variable.")
 
+# add complete absolute path to the image folder
 # Setup paths for saving images and audio
 image_folder = 'uploads/images'
+image_folder = os.path.join(os.getcwd(), image_folder)
 audio_folder = 'uploads/audio'
+audio_folder = os.path.join(os.getcwd(), audio_folder)
 transcription_folder = 'uploads/transcriptions'
+transcription_folder = os.path.join(os.getcwd(), transcription_folder)
 speech_folder = 'uploads/speech'
+speech_folder = os.path.join(os.getcwd(), speech_folder)
+
+# Define the path to your uploads directory (this should be relative to your project directory)
+UPLOAD_FOLDER = speech_folder
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 if not os.path.exists(image_folder):
     os.makedirs(image_folder)
@@ -50,45 +59,59 @@ def tts(text):
         input=text
     )
     response.stream_to_file(speech_file_path)
-    return speech_file_path
+    return response_file_name
+
+message_history = []
+message_history.append({
+    "role": "system",
+    "content": [
+        {
+            "type": "text",
+            "text": "You are a First aid Personal Doctor. You are tasked with diagnosing the patient from the description of the problem and the image provided."
+                    "The patient is located at address 1868 Floribunda Ave, Hillsborough, CA 94010. Please provide a diagnosis and first aid plan such as ordering medicines and so on."
+                    "Patient's name is Poorna. Please interact with the patient to get more information."
+        }
+    ]
+})
 
 def call_model(transcription_text, images):
 
     headers = {
-    "Content-Type": "application/json",
-    "Authorization": f"Bearer {openai.api_key}"
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {openai.api_key}"
     }
-
-    payload = {
-    "model": "gpt-4o-mini",
-    "messages": [
-        {
+    message_history.append({
         "role": "user",
         "content": [
             {
-            "type": "text",
-            "text": "You are a First aid Personal Doctor. You are tasked with diagnosing the patient from the description of the problem and the image provided."
-                    "The patient is located at address 1868 Floribunda Ave, Hillsborough, CA 94010. Please provide a diagnosis and first aid plan such as ordering medicines and so on."
-                    f"Patient's name is Poorna. Patient described the problem as {transcription_text}." 
-            },
+                "type": "text",
+                "text": f"{transcription_text}"
+            }
         ]
-        }
-    ],
+    })
+    
+    payload = {
+        "model": "gpt-4o-mini",
+        "messages": message_history
     }
 
     for image in images:
         base64_image = encode_image(image)
         print("Image is being added")
-        payload["messages"][0]["content"].append({
+        payload["messages"][-1]["content"].append({
             "type": "image_url",
             "image_url": {
                 "url": f"data:image/jpeg;base64,{base64_image}"
             }
             
         })
-    print("Calling model...")
+    print("Calling model... ", transcription_text)
     response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
     res_msg = response.json()['choices'][0]['message']['content']
+    message_history.append({
+        "role": "assistant",
+        "content": res_msg
+    })
     # print(response.json())
     return res_msg
 
@@ -125,6 +148,11 @@ def upload_image():
     image = request.files['image']
     image.save(os.path.join(image_folder, image.filename))
     return 'Image uploaded successfully'
+
+@app.route('/uploads/speech/<filename>')
+def serve_audio(filename):
+    # Serve the file from the uploads directory
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
 
 # Route to handle audio upload
 @app.route('/upload_media', methods=['POST'])
@@ -172,7 +200,7 @@ def upload_audio():
     response = call_model(transcription_text, images)
     print("Response is ", response)
     audio_response = tts(response)
-    return jsonify({"response": audio_response})
+    return jsonify({"file_url": f"/uploads/speech/{audio_response}"})
 
 
 @app.route('/actual_response')
