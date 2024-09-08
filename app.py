@@ -207,6 +207,5 @@ def upload_audio():
 def actual_response():
     modelResponse("I have a headache")
 
-
 if __name__ == '__main__':
     app.run(debug=True)

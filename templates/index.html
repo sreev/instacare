@@ -6,12 +6,22 @@
     <title>Instant Care Personal Doctor</title>
 </head>
 <body>
-    <h1>Instant Care Personal Doctor</h1>
+    <h1 style="text-align: center;">Instant Care Personal Doctor</h1>
+
+    <style>
+        /* Center the buttons */
+        .button-container {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px; /* Optional: add some space above the buttons */
+        }
+    </style>
 
     <video id="video" width="640" height="480" autoplay muted></video>
-    <button id="start">Start Recording</button>
-    <button id="stop" disabled>Stop Recording</button>
-
+    <div class="button-container">
+    <button id="start">Talk to Doctor</button>
+    <button id="stop" disabled>Done</button>
+    </div>
     <script>
         let mediaRecorder;
         let recordedChunks = [];
