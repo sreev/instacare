@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 from openai import OpenAI
 import time
-client = OpenAI()
+import threading
 
 app = Flask(__name__)
 
@@ -48,6 +48,8 @@ if not os.path.exists(speech_folder):
     os.makedirs(speech_folder)
 
 whisper_model = whisper.load_model("base")
+
+client = OpenAI()
 
 def tts(text):
     # add timestamp to the file name
@@ -115,7 +117,7 @@ def call_model(transcription_text, images):
     # print(response.json())
     return res_msg
 
-def modelResponse(prompt):
+def ollama_ipc(prompt):
     url = "http://192.168.3.251:11434/api/generate"
     headers = {
         "Content-Type": "application/json"
@@ -136,7 +138,7 @@ def modelResponse(prompt):
         return actual_response
     else:
         print("Error: ", response.status_code, response.text)
-
+    return "Done"
 
 @app.route('/')
 def index():
@@ -198,14 +200,12 @@ def upload_audio():
     images = [os.path.join(image_folder, image) for image in os.listdir(image_folder)]
 
     response = call_model(transcription_text, images)
+    # Start ollama_ipc in a separate thread and ignore its result
+    thread = threading.Thread(target=ollama_ipc, args=(transcription_text,))
+    thread.start()
     print("Response is ", response)
     audio_response = tts(response)
     return jsonify({"file_url": f"/uploads/speech/{audio_response}"})
-
-
-@app.route('/actual_response')
-def actual_response():
-    modelResponse("I have a headache")
 
 if __name__ == '__main__':
     app.run(debug=True)
